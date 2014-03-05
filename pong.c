@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 #include <ncurses.h>
 #include <unistd.h>
 
@@ -13,9 +14,13 @@ int main(int argc, char *argv[])
 
     int maxScore = 5;
 
+    int directions[] = {-1, 1};
+    
+    srand(time(NULL));
+
     // TODO: randomize direction
-    int xDirection = -1,
-        yDirection = 1;
+    int xDirection = directions[rand() % 2],
+        yDirection = directions[rand() % 2];
 
     int paddleSize = 10;
 
@@ -26,7 +31,9 @@ int main(int argc, char *argv[])
         player2PaddleY = 0;
 
     int startX = 0,
-        startY = 0;
+        startY = 0,
+        fieldMaxX = 0,
+        fieldMaxY = 0;
 
     int ch = 0;
 
@@ -45,21 +52,26 @@ int main(int argc, char *argv[])
     curX = startX;
     curY = startY;
 
+    WINDOW *gameField = newwin(maxY - 1, maxX, 0, 0);
+    WINDOW *statusBar = newwin(1, maxX, maxY - 1, 0);
+
     player1PaddleY = player2PaddleY = startY - (paddleSize / 2);
+
+    getmaxyx(gameField, fieldMaxY, fieldMaxX);
 
     while(1) {
         // game loop
 
-        clear();
-        // check for typed char
+        wclear(gameField);
 
+        // check for typed char -- TODO: read in a keydown event
         if ((ch = getch()) != ERR) {
             if (ch == 'a' && player1PaddleY > 0) {
                 // move player1 paddle up
                 player1PaddleY--;
             }
 
-            if (ch == 'z' && (player1PaddleY + paddleSize) < (maxY)) {
+            if (ch == 'z' && (player1PaddleY + paddleSize) < (fieldMaxY)) {
                 // move player1 paddle down
                 player1PaddleY++;
             }
@@ -69,36 +81,50 @@ int main(int argc, char *argv[])
                 player2PaddleY--;
             }
 
-            if (ch == '.' && (player2PaddleY + paddleSize) < (maxY)) {
+            if (ch == '.' && (player2PaddleY + paddleSize) < (fieldMaxY)) {
                 // move player2 paddle down
                 player2PaddleY++;
             }
         }
 
-        // draw scoreboard
-        mvprintw(0, 2, "Player 1: %02d, Player 2: %02d", player1Score, player2Score);
+        // status bar
+        wclear(statusBar);
+        mvwprintw(statusBar, 0, maxX / 4, "%02d", player1Score);
+        mvwprintw(statusBar, 0, (maxX / 4) * 3, "%02d", player2Score);
+        wrefresh(statusBar);
 
         // Draw player 1 paddle
         for (i = 0; i < paddleSize; i++) {
-            mvprintw(player1PaddleY + i, 0, "|");
+            mvwprintw(gameField, player1PaddleY + i, 0, "|");
         }
 
         // Draw player 2 paddle
         for (i = 0; i < paddleSize; i++) {
-            mvprintw(player2PaddleY + i, maxX - 1, "|");
+            mvwprintw(gameField, player2PaddleY + i, fieldMaxX - 1, "|");
         }
+
+        if (player1Score == maxScore || player2Score == maxScore) {
+            mvwprintw(gameField, fieldMaxY / 2, fieldMaxX / 2, "Game Over.");
+            wrefresh(gameField);
+
+            sleep(2);
+
+            curX = startX;
+            curY = startY;
+
+            player1Score = 0;
+            player2Score = 0;
+
+            player1PaddleY = player2PaddleY = startY - (paddleSize / 2);
+        }
+
 
         // Draw the ball
-        move(curY, curX);
-
-        if ((curY > 0 && curY < maxY) || (curY == 0 && curX < 2 && curX > 28)) {
-            printw("o");
-        }
-
-        refresh();
+        mvwprintw(gameField, curY, curX, "o");
+        wrefresh(gameField);
 
         // if the ball hits the top or bottom, bounce it
-        if (curY >= (maxY - 1) || curY <= 0) {
+        if (curY >= (fieldMaxY - 1) || curY <= 0) {
             yDirection = yDirection * -1;
         }
 
@@ -111,10 +137,13 @@ int main(int argc, char *argv[])
 
                 curX = startX;
                 curY = startY;
+                
+                xDirection = directions[rand() % 2],
+                yDirection = directions[rand() % 2];
             }
         }
 
-        if ((curX + xDirection) >= (maxX - 1)) {
+        if ((curX + xDirection) >= (fieldMaxX - 1)) {
             if (curY >= player2PaddleY && curY <= player2PaddleY + paddleSize) {
                 xDirection = xDirection * -1;
             } else {
@@ -122,25 +151,23 @@ int main(int argc, char *argv[])
 
                 curX = startX;
                 curY = startY;
-
+                
+                xDirection = directions[rand() % 2],
+                yDirection = directions[rand() % 2];
             }
 
         }
 
-        // if (player1Score > maxScore || player2Score > maxScore) {
-        //     game_over();
-        // }
-
-        // if (curX >= (maxX - 1) || curX <= 0) {
-        //     xDirection = xDirection * -1;
-        // }
-
-
         curX += xDirection;
         curY += yDirection;
 
-        usleep(50000);
+        usleep(45000);
     }
+
+    sleep(1);
+
+    delwin(gameField);
+    delwin(statusBar);
 
     endwin();
 
